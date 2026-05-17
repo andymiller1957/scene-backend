@@ -2,14 +2,22 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const fetch = require('node-fetch');
-const FormData = require('form-data');
 require('dotenv').config();
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
-app.use(cors({ origin: process.env.ALLOWED_ORIGIN || '*' }));
-app.use(express.json({ limit: '15mb' }));
+// Explicit CORS — must be before all routes
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
 const REPLICATE_BASE = 'https://api.replicate.com/v1';
@@ -51,8 +59,10 @@ async function pollUntilDone(getUrl, maxAttempts = 40) {
   throw new Error('Prediction timed out after 100 seconds');
 }
 
-// POST /generate — generate a scene image with InstantID
-// Body: { imageBase64: string, prompt: string, negativePrompt?: string }
+// GET /health
+app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+// POST /generate — InstantID with face
 app.post('/generate', requireApiKey, async (req, res) => {
   const { imageBase64, prompt, negativePrompt } = req.body;
 
@@ -73,7 +83,6 @@ app.post('/generate', requireApiKey, async (req, res) => {
       },
     });
 
-    // If not done yet, poll
     if (data.status && data.status !== 'succeeded' && data.urls?.get) {
       data = await pollUntilDone(data.urls.get);
     }
@@ -91,7 +100,7 @@ app.post('/generate', requireApiKey, async (req, res) => {
   }
 });
 
-// POST /generate-scene — generate without face (FLUX, no reference photo)
+// POST /generate-scene — FLUX without face
 app.post('/generate-scene', requireApiKey, async (req, res) => {
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: 'prompt is required' });
@@ -119,9 +128,6 @@ app.post('/generate-scene', requireApiKey, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-// GET /health
-app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Scene backend running on http://localhost:${PORT}`));
