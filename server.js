@@ -1,13 +1,10 @@
 const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
 const fetch = require('node-fetch');
 require('dotenv').config();
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
-// Explicit CORS — must be before all routes
+// CORS — must be before all routes
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -17,15 +14,9 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const REPLICATE_API_KEY = process.env.REPLICATE_API_KEY;
 const REPLICATE_BASE = 'https://api.replicate.com/v1';
-
-function requireApiKey(req, res, next) {
-  if (!REPLICATE_API_KEY) return res.status(500).json({ error: 'REPLICATE_API_KEY not set on server' });
-  next();
-}
 
 async function replicatePost(path, body) {
   const res = await fetch(`${REPLICATE_BASE}${path}`, {
@@ -56,16 +47,23 @@ async function pollUntilDone(getUrl, maxAttempts = 40) {
       throw new Error(`Prediction ${data.status}: ${data.error || 'unknown error'}`);
     }
   }
-  throw new Error('Prediction timed out after 100 seconds');
+  throw new Error('Prediction timed out');
 }
 
 // GET /health
-app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// GET / — homepage so Railway doesn't 404
+app.get('/', (req, res) => {
+  res.json({ status: 'Scene backend running', version: '1.0.0' });
+});
 
 // POST /generate — InstantID with face
-app.post('/generate', requireApiKey, async (req, res) => {
+app.post('/generate', async (req, res) => {
+  if (!REPLICATE_API_KEY) return res.status(500).json({ error: 'REPLICATE_API_KEY not set' });
   const { imageBase64, prompt, negativePrompt } = req.body;
-
   if (!imageBase64) return res.status(400).json({ error: 'imageBase64 is required' });
   if (!prompt) return res.status(400).json({ error: 'prompt is required' });
 
@@ -74,7 +72,7 @@ app.post('/generate', requireApiKey, async (req, res) => {
       input: {
         image: imageBase64,
         prompt,
-        negative_prompt: negativePrompt || 'blurry, low quality, deformed, cartoon, painting, watermark',
+        negative_prompt: negativePrompt || 'blurry, low quality, deformed, cartoon, watermark',
         num_inference_steps: 30,
         guidance_scale: 5,
         ip_adapter_scale: 0.8,
@@ -101,19 +99,14 @@ app.post('/generate', requireApiKey, async (req, res) => {
 });
 
 // POST /generate-scene — FLUX without face
-app.post('/generate-scene', requireApiKey, async (req, res) => {
+app.post('/generate-scene', async (req, res) => {
+  if (!REPLICATE_API_KEY) return res.status(500).json({ error: 'REPLICATE_API_KEY not set' });
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: 'prompt is required' });
 
   try {
     let data = await replicatePost('/models/black-forest-labs/flux-schnell/predictions', {
-      input: {
-        prompt,
-        num_outputs: 2,
-        aspect_ratio: '3:4',
-        output_format: 'webp',
-        output_quality: 90,
-      },
+      input: { prompt, num_outputs: 2, aspect_ratio: '3:4', output_format: 'webp', output_quality: 90 },
     });
 
     if (data.status && data.status !== 'succeeded' && data.urls?.get) {
@@ -129,5 +122,6 @@ app.post('/generate-scene', requireApiKey, async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Scene backend running on http://localhost:${PORT}`));
+// Use Railway's PORT env variable
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
