@@ -29,6 +29,12 @@ async function poll(url) {
 
 app.get('/', (req, res) => res.json({ status: 'ok' }));
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/debug', (req, res) => {
+  res.json({ 
+    hasKey: !!process.env.REPLICATE_API_KEY,
+    keyStart: process.env.REPLICATE_API_KEY ? process.env.REPLICATE_API_KEY.slice(0,6) : 'MISSING'
+  });
+});
 
 // FLUX — reliable scene generation
 app.post('/generate', async (req, res) => {
