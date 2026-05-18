@@ -133,16 +133,12 @@ app.post('/generate-face', async (req, res) => {
       { prompt, num_outputs: 1, aspect_ratio: '3:4', output_format: 'webp', output_quality: 90 });
     console.log('Scene generated:', sceneUrl);
 
-    // Step 3: High quality face swap with xiankgx/face-swap
+    // Step 3: High quality face swap with easel/advanced-face-swap
     console.log('Swapping face (high quality)...');
-    const faceSwapUrl = await runPrediction('/v1/predictions', {
-      version: 'a07f252abbbd832009640b27f063ea52d87d7a23a185ca165bec23b5adc8deaf',
+    const faceSwapUrl = await runPrediction('/v1/models/easel/advanced-face-swap/predictions', {
+      swap_image: faceUrl,
       target_image: sceneUrl,
-      source_image: faceUrl,
-      face_restore: true,
-      background_enhance: true,
-      face_upsample: true,
-      upscale: 2
+      hair_source: 'target'
     });
     console.log('Face swap done:', faceSwapUrl);
 
