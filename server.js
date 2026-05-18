@@ -129,10 +129,10 @@ app.post('/generate-face', async (req, res) => {
 
     // Step 3: Swap face onto scene
 console.log('Swapping face...');
-const faceSwapUrl = await runPrediction('/v1/models/easel/advanced-face-swap/predictions', {
-  swap_image: faceUrl,
-  target_image: sceneUrl,
-  hair_source: 'target'
+const faceSwapUrl = await runPrediction('/v1/predictions', {
+  version: '278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34',
+  input_image: sceneUrl,
+  swap_image: faceUrl
 });
     console.log('Face swap done:', faceSwapUrl);
 
