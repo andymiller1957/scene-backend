@@ -133,26 +133,31 @@ app.post('/generate-face', async (req, res) => {
       { prompt, num_outputs: 1, aspect_ratio: '3:4', output_format: 'webp', output_quality: 90 });
     console.log('Scene generated:', sceneUrl);
 
-    // Step 3: High quality face swap with easel/advanced-face-swap
-    console.log('Swapping face (high quality)...');
-    const faceSwapUrl = await runPrediction('/v1/models/easel/advanced-face-swap/predictions', {
-      swap_image: faceUrl,
-      target_image: sceneUrl,
-      hair_source: 'target'
+    // Step 3: Face swap with codeplugtech/face-swap
+    console.log('Swapping face...');
+    const faceSwapUrl = await runPrediction('/v1/predictions', {
+      version: '278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34',
+      input_image: sceneUrl,
+      swap_image: faceUrl
     });
     console.log('Face swap done:', faceSwapUrl);
 
-    // Step 4: Upscale final result
+    // Step 4: Upscale final result with Real-ESRGAN
     console.log('Upscaling result...');
-    const upscaledUrl = await runPrediction('/v1/predictions', {
-      version: 'f121d640bd286e1fdc67f9799164c1d5be36ff74576ee11c803ae5b665dd374d',
-      image: faceSwapUrl,
-      scale: 2,
-      face_enhance: true
-    });
-    console.log('Upscale done:', upscaledUrl);
+    let finalUrl = faceSwapUrl;
+    try {
+      const upscaledUrl = await runPrediction('/v1/models/nightmareai/real-esrgan/predictions', {
+        image: faceSwapUrl,
+        scale: 2,
+        face_enhance: true
+      });
+      console.log('Upscale done:', upscaledUrl);
+      finalUrl = upscaledUrl;
+    } catch(upscaleErr) {
+      console.log('Upscale failed, using face swap result:', upscaleErr.message);
+    }
 
-    res.json({ imageUrl: upscaledUrl, sceneUrl, faceSwapUrl });
+    res.json({ imageUrl: finalUrl, sceneUrl, faceSwapUrl });
   } catch(e) {
     console.error('Face mode error:', e.message);
     res.status(500).json({ error: e.message });
