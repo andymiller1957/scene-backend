@@ -141,7 +141,7 @@ app.post('/generate-face', async (req, res) => {
     console.log('Kontext generating:', prompt.slice(0, 60));
     const r = await httpsRequest('POST', 'api.replicate.com',
       '/v1/models/black-forest-labs/flux-kontext-pro/predictions',
-      { input: { input_image: imageUrl, prompt, aspect_ratio: '3:4', output_format: 'webp', output_quality: 90, safety_tolerance: 2 } },
+      { input: { input_image: imageUrl, prompt, aspect_ratio: "3:4", safety_tolerance: 2 } },
       { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }
     );
     console.log('Kontext response:', r.status, r.data.id, r.data.error || JSON.stringify(r.data).slice(0,100));
