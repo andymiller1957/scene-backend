@@ -128,11 +128,11 @@ app.post('/generate-face', async (req, res) => {
     console.log('Scene generated:', sceneUrl);
 
     // Step 3: Swap face onto scene
-    console.log('Swapping face...');
-const faceSwapUrl = await runPrediction('/v1/predictions', {
-  version: 'codeplugtech/face-swap:c2d783366e8d32e6ede5c8f41e9af2be28e01d57b13a0bf2570fd603eec2c012',
-  source_image: faceUrl,
-  target_image: sceneUrl
+console.log('Swapping face...');
+const faceSwapUrl = await runPrediction('/v1/models/easel/advanced-face-swap/predictions', {
+  swap_image: faceUrl,
+  target_image: sceneUrl,
+  hair_source: 'target'
 });
     console.log('Face swap done:', faceSwapUrl);
 
