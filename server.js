@@ -129,10 +129,11 @@ app.post('/generate-face', async (req, res) => {
 
     // Step 3: Swap face onto scene
     console.log('Swapping face...');
-    const faceSwapUrl = await runPrediction('/v1/predictions', {
-      version: 'lucataco/faceswap:9a4298548422074c3f57258c5d544497314ae4112df80d116f0d2109e843d20d', target_image: sceneUrl,
-      swap_image: faceUrl
-    });
+const faceSwapUrl = await runPrediction('/v1/predictions', {
+  version: 'codeplugtech/face-swap:c2d783366e8d32e6ede5c8f41e9af2be28e01d57b13a0bf2570fd603eec2c012',
+  source_image: faceUrl,
+  target_image: sceneUrl
+});
     console.log('Face swap done:', faceSwapUrl);
 
     res.json({ imageUrl: faceSwapUrl, sceneUrl });
