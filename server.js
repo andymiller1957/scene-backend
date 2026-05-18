@@ -26,7 +26,7 @@ function httpsPost(hostname, path, data, headers) {
       res.on('data', chunk => raw += chunk);
       res.on('end', () => {
         try { resolve(JSON.parse(raw)); }
-        catch(e) { reject(new Error('Invalid JSON: ' + raw.slice(0, 200))); }
+        catch(e) { reject(new Error('Invalid JSON: ' + raw.slice(0, 300))); }
       });
     });
     req.on('error', reject);
@@ -42,7 +42,7 @@ function httpsGet(hostname, path, headers) {
       res.on('data', chunk => raw += chunk);
       res.on('end', () => {
         try { resolve(JSON.parse(raw)); }
-        catch(e) { reject(new Error('Invalid JSON: ' + raw.slice(0, 200))); }
+        catch(e) { reject(new Error('Invalid JSON: ' + raw.slice(0, 300))); }
       });
     });
     req.on('error', reject);
@@ -65,13 +65,13 @@ app.get('/', (req, res) => res.json({ status: 'ok' }));
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 app.get('/debug', (req, res) => res.json({ hasKey: !!KEY, keyStart: KEY ? KEY.slice(0, 8) : 'MISSING' }));
 
+// FLUX Schnell — fast scene generation, no face
 app.post('/generate', async (req, res) => {
   if (!KEY) return res.status(500).json({ error: 'REPLICATE_API_KEY not set' });
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: 'prompt required' });
-
   try {
-    console.log('Generating:', prompt.slice(0, 60));
+    console.log('FLUX generating:', prompt.slice(0, 60));
     const d = await httpsPost('api.replicate.com',
       '/v1/models/black-forest-labs/flux-schnell/predictions',
       { input: { prompt, num_outputs: 1, aspect_ratio: '3:4', output_format: 'webp', output_quality: 90 } },
@@ -82,31 +82,33 @@ app.post('/generate', async (req, res) => {
     if (d.id && d.status !== 'succeeded') result = await poll(d.id);
     if (!result.output) return res.status(500).json({ error: 'No output', raw: result });
     const url = Array.isArray(result.output) ? result.output[0] : result.output;
-    console.log('Success:', url);
     res.json({ imageUrl: url });
   } catch (e) {
-    console.error('Error:', e.message);
+    console.error('FLUX error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
+// FLUX Kontext Pro — best face preservation, places person in scene
 app.post('/generate-face', async (req, res) => {
   if (!KEY) return res.status(500).json({ error: 'REPLICATE_API_KEY not set' });
   const { imageBase64, prompt } = req.body;
   if (!imageBase64 || !prompt) return res.status(400).json({ error: 'imageBase64 and prompt required' });
-
   try {
+    console.log('Kontext generating:', prompt.slice(0, 60));
     const d = await httpsPost('api.replicate.com',
-      '/v1/models/zsxkib/instant-id/predictions',
-      { input: { image: imageBase64, prompt, negative_prompt: 'blurry, low quality, deformed, watermark', num_inference_steps: 30, guidance_scale: 5, ip_adapter_scale: 0.8, controlnet_conditioning_scale: 0.8 } },
+      '/v1/models/black-forest-labs/flux-kontext-pro/predictions',
+      { input: { input_image: imageBase64, prompt, aspect_ratio: '3:4', output_format: 'webp', output_quality: 90, safety_tolerance: 2 } },
       { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }
     );
+    console.log('Kontext response:', d.status, d.id, d.error || '');
     let result = d;
     if (d.id && d.status !== 'succeeded') result = await poll(d.id);
     if (!result.output) return res.status(500).json({ error: 'No output', raw: result });
     const url = Array.isArray(result.output) ? result.output[0] : result.output;
     res.json({ imageUrl: url });
   } catch (e) {
+    console.error('Kontext error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
