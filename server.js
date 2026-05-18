@@ -127,7 +127,8 @@ app.post('/generate-face', async (req, res) => {
 
     // Step 3: Swap face onto scene
     console.log('Swapping face...');
-    const faceSwapUrl = await runPrediction('/v1/models/lucataco/faceswap/predictions', {
+    const faceSwapUrl = await runPrediction('/v1/predictions', {
+      version: 'lucataco/faceswap:9a4298548422074c3f57258c5d544497314ae4112df80d116f0d2109e843d20d',
       target_image: sceneUrl,
       swap_image: faceUrl
     });
