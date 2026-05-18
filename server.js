@@ -18,10 +18,16 @@ const KEY = process.env.REPLICATE_API_KEY;
 function httpsPost(hostname, path, data, headers) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify(data);
-    const req = https.request({ hostname, path, method: 'POST', headers: { ...headers, 'Content-Length': Buffer.byteLength(body) } }, (res) => {
+    const req = https.request({
+      hostname, path, method: 'POST',
+      headers: { ...headers, 'Content-Length': Buffer.byteLength(body) }
+    }, (res) => {
       let raw = '';
       res.on('data', chunk => raw += chunk);
-      res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(new Error('Invalid JSON: ' + raw.slice(0,200))); } });
+      res.on('end', () => {
+        try { resolve(JSON.parse(raw)); }
+        catch(e) { reject(new Error('Invalid JSON: ' + raw.slice(0, 200))); }
+      });
     });
     req.on('error', reject);
     req.write(body);
@@ -34,7 +40,10 @@ function httpsGet(hostname, path, headers) {
     const req = https.request({ hostname, path, method: 'GET', headers }, (res) => {
       let raw = '';
       res.on('data', chunk => raw += chunk);
-      res.on('end', () => { try { resolve(JSON.parse(raw)); } catch(e) { reject(new Error('Invalid JSON: ' + raw.slice(0,200))); } });
+      res.on('end', () => {
+        try { resolve(JSON.parse(raw)); }
+        catch(e) { reject(new Error('Invalid JSON: ' + raw.slice(0, 200))); }
+      });
     });
     req.on('error', reject);
     req.end();
@@ -42,10 +51,9 @@ function httpsGet(hostname, path, headers) {
 }
 
 async function poll(id) {
-  const headers = { Authorization: `Bearer ${KEY}` };
   for (let i = 0; i < 60; i++) {
     await new Promise(r => setTimeout(r, 3000));
-    const d = await httpsGet('api.replicate.com', `/v1/predictions/${id}`, headers);
+    const d = await httpsGet('api.replicate.com', `/v1/predictions/${id}`, { Authorization: `Bearer ${KEY}` });
     console.log('Poll:', d.status);
     if (d.status === 'succeeded') return d;
     if (d.status === 'failed') throw new Error(d.error || 'Prediction failed');
@@ -64,11 +72,12 @@ app.post('/generate', async (req, res) => {
 
   try {
     console.log('Generating:', prompt.slice(0, 60));
-    const d = await httpsPost('api.replicate.com', '/v1/models/black-forest-labs/flux-schnell/predictions', {
-      input: { prompt, num_outputs: 1, aspect_ratio: '3:4', output_format: 'webp', output_quality: 90 }
-    }, { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' });
-
-    console.log('Response status:', d.status, 'id:', d.id);
+    const d = await httpsPost('api.replicate.com',
+      '/v1/models/black-forest-labs/flux-schnell/predictions',
+      { input: { prompt, num_outputs: 1, aspect_ratio: '3:4', output_format: 'webp', output_quality: 90 } },
+      { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }
+    );
+    console.log('Response:', d.status, d.id, d.error || '');
     let result = d;
     if (d.id && d.status !== 'succeeded') result = await poll(d.id);
     if (!result.output) return res.status(500).json({ error: 'No output', raw: result });
@@ -87,10 +96,11 @@ app.post('/generate-face', async (req, res) => {
   if (!imageBase64 || !prompt) return res.status(400).json({ error: 'imageBase64 and prompt required' });
 
   try {
-    const d = await httpsPost('api.replicate.com', '/v1/models/zsxkib/instant-id/predictions', {
-      input: { image: imageBase64, prompt, negative_prompt: 'blurry, low quality, deformed, watermark', num_inference_steps: 30, guidance_scale: 5, ip_adapter_scale: 0.8, controlnet_conditioning_scale: 0.8 }
-    }, { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' });
-
+    const d = await httpsPost('api.replicate.com',
+      '/v1/models/zsxkib/instant-id/predictions',
+      { input: { image: imageBase64, prompt, negative_prompt: 'blurry, low quality, deformed, watermark', num_inference_steps: 30, guidance_scale: 5, ip_adapter_scale: 0.8, controlnet_conditioning_scale: 0.8 } },
+      { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }
+    );
     let result = d;
     if (d.id && d.status !== 'succeeded') result = await poll(d.id);
     if (!result.output) return res.status(500).json({ error: 'No output', raw: result });
