@@ -40,7 +40,7 @@ async function poll(id) {
     const r = await httpsRequest('GET', 'api.replicate.com', `/v1/predictions/${id}`, null,
       { Authorization: `Bearer ${KEY}` });
     console.log('Poll:', r.data.status);
-    if (r.data.status === 'succeeded') return r.data;
+    if (r.data.status === 'succeeded') { console.log('Output:', JSON.stringify(r.data.output)); return r.data; }
     if (r.data.status === 'failed') throw new Error(r.data.error || 'Prediction failed');
   }
   throw new Error('Timed out');
