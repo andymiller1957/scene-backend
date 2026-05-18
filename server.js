@@ -86,7 +86,10 @@ async function runPrediction(path, input) {
   let result = r.data;
   if (result.id && result.status !== 'succeeded') result = await poll(result.id);
   if (!result.output) throw new Error('No output: ' + JSON.stringify(result).slice(0, 200));
-  return Array.isArray(result.output) ? result.output[0] : result.output;
+  const out = Array.isArray(result.output) ? result.output[0] : result.output;
+console.log('Output type:', typeof out, 'Value:', JSON.stringify(out).slice(0, 200));
+if (out && typeof out === 'object' && out.url) return out.url();
+return out;
 }
 
 app.get('/', (req, res) => res.json({ status: 'ok' }));
