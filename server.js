@@ -40,7 +40,10 @@ async function poll(id) {
     const r = await httpsRequest('GET', 'api.replicate.com', `/v1/predictions/${id}`, null,
       { Authorization: `Bearer ${KEY}` });
     console.log('Poll:', r.data.status);
-    if (r.data.status === 'succeeded') { console.log('Output:', JSON.stringify(r.data.output)); return r.data; }
+    if (r.data.status === 'succeeded') {
+      console.log('RAW OUTPUT:', JSON.stringify(r.data.output));
+      return r.data;
+    }
     if (r.data.status === 'failed') throw new Error(r.data.error || 'Prediction failed');
   }
   throw new Error('Timed out');
@@ -78,19 +81,18 @@ async function uploadImage(base64DataUrl) {
 }
 
 async function runPrediction(path, input) {
-  // If input has a version field, move it to top level
-  const body = input.version ? { version: input.version, input: Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'version')) } : { input };
+  const body = input.version
+    ? { version: input.version, input: Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'version')) }
+    : { input };
   const r = await httpsRequest('POST', 'api.replicate.com', path, body,
-    { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json', 'Prefer': 'wait=60'});
-  console.log('Prediction response:', r.status, r.data.id, r.data.error || '');
+    { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' });
+  console.log('Prediction:', r.status, r.data.id, r.data.error || '');
   let result = r.data;
   if (result.id && result.status !== 'succeeded') result = await poll(result.id);
   const output = result.output || result.urls?.get || null;
-if (!output) throw new Error('No output: ' + JSON.stringify(result).slice(0, 200));
-return Array.isArray(output) ? output[0] : output;
-console.log('Output type:', typeof out, 'Value:', JSON.stringify(out).slice(0, 200));
-if (out && typeof out === 'object' && out.url) return out.url();
-return out;
+  if (!output) throw new Error('No output: ' + JSON.stringify(result).slice(0, 200));
+  const url = Array.isArray(output) ? output[0] : output;
+  return typeof url === 'object' ? (url.url ? url.url() : JSON.stringify(url)) : url;
 }
 
 app.get('/', (req, res) => res.json({ status: 'ok' }));
@@ -113,7 +115,7 @@ app.post('/generate', async (req, res) => {
   }
 });
 
-// Face mode: generate scene with FLUX then swap face
+// Face mode: FLUX scene + better face swap + upscale
 app.post('/generate-face', async (req, res) => {
   if (!KEY) return res.status(500).json({ error: 'REPLICATE_API_KEY not set' });
   const { imageBase64, prompt } = req.body;
@@ -131,16 +133,30 @@ app.post('/generate-face', async (req, res) => {
       { prompt, num_outputs: 1, aspect_ratio: '3:4', output_format: 'webp', output_quality: 90 });
     console.log('Scene generated:', sceneUrl);
 
-    // Step 3: Swap face onto scene
-console.log('Swapping face...');
-const faceSwapUrl = await runPrediction('/v1/predictions', {
-  version: '278a81e7ebb22db98bcba54de985d22cc1abeead2754eb1f2af717247be69b34',
-  input_image: sceneUrl,
-  swap_image: faceUrl
-});
-    console.log('FINAL URL:', JSON.stringify(faceSwapUrl));
+    // Step 3: High quality face swap with xiankgx/face-swap
+    console.log('Swapping face (high quality)...');
+    const faceSwapUrl = await runPrediction('/v1/predictions', {
+      version: 'a07f252abbbd832009640b27f063ea52d87d7a23a185ca165bec23b5adc8deaf',
+      target_image: sceneUrl,
+      source_image: faceUrl,
+      face_restore: true,
+      background_enhance: true,
+      face_upsample: true,
+      upscale: 2
+    });
+    console.log('Face swap done:', faceSwapUrl);
 
-    res.json({ imageUrl: faceSwapUrl, sceneUrl });
+    // Step 4: Upscale final result
+    console.log('Upscaling result...');
+    const upscaledUrl = await runPrediction('/v1/predictions', {
+      version: 'f121d640bd286e1fdc67f9799164c1d5be36ff74576ee11c803ae5b665dd374d',
+      image: faceSwapUrl,
+      scale: 2,
+      face_enhance: true
+    });
+    console.log('Upscale done:', upscaledUrl);
+
+    res.json({ imageUrl: upscaledUrl, sceneUrl, faceSwapUrl });
   } catch(e) {
     console.error('Face mode error:', e.message);
     res.status(500).json({ error: e.message });
