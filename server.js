@@ -138,7 +138,7 @@ const faceSwapUrl = await runPrediction('/v1/predictions', {
   input_image: sceneUrl,
   swap_image: faceUrl
 });
-    console.log('Face swap done:', faceSwapUrl);
+    console.log('FINAL URL:', JSON.stringify(faceSwapUrl));
 
     res.json({ imageUrl: faceSwapUrl, sceneUrl });
   } catch(e) {
