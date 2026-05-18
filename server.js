@@ -81,12 +81,13 @@ async function runPrediction(path, input) {
   // If input has a version field, move it to top level
   const body = input.version ? { version: input.version, input: Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'version')) } : { input };
   const r = await httpsRequest('POST', 'api.replicate.com', path, body,
-    { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' });
+    { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' Prefer: 'wait=60'});
   console.log('Prediction response:', r.status, r.data.id, r.data.error || '');
   let result = r.data;
   if (result.id && result.status !== 'succeeded') result = await poll(result.id);
-  if (!result.output) throw new Error('No output: ' + JSON.stringify(result).slice(0, 200));
-  const out = Array.isArray(result.output) ? result.output[0] : result.output;
+  const output = result.output || result.urls?.get || null;
+if (!output) throw new Error('No output: ' + JSON.stringify(result).slice(0, 200));
+return Array.isArray(output) ? output[0] : output;
 console.log('Output type:', typeof out, 'Value:', JSON.stringify(out).slice(0, 200));
 if (out && typeof out === 'object' && out.url) return out.url();
 return out;
