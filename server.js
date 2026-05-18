@@ -78,7 +78,9 @@ async function uploadImage(base64DataUrl) {
 }
 
 async function runPrediction(path, input) {
-  const r = await httpsRequest('POST', 'api.replicate.com', path, { input },
+  // If input has a version field, move it to top level
+  const body = input.version ? { version: input.version, input: Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'version')) } : { input };
+  const r = await httpsRequest('POST', 'api.replicate.com', path, body,
     { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' });
   console.log('Prediction response:', r.status, r.data.id, r.data.error || '');
   let result = r.data;
@@ -128,8 +130,7 @@ app.post('/generate-face', async (req, res) => {
     // Step 3: Swap face onto scene
     console.log('Swapping face...');
     const faceSwapUrl = await runPrediction('/v1/predictions', {
-      version: 'lucataco/faceswap:9a4298548422074c3f57258c5d544497314ae4112df80d116f0d2109e843d20d',
-      target_image: sceneUrl,
+      version: 'lucataco/faceswap:9a4298548422074c3f57258c5d544497314ae4112df80d116f0d2109e843d20d', target_image: sceneUrl,
       swap_image: faceUrl
     });
     console.log('Face swap done:', faceSwapUrl);
